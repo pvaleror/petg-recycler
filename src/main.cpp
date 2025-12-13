@@ -17,6 +17,8 @@
 
 #include <Arduino.h>
 #include <Eventually.h>
+#include <WiFi.h>
+#include <esp_bt.h>
 
 // Project modules
 #include <Config.h>
@@ -32,20 +34,74 @@
 EvtManager mgr;
 
 void setup() {
+    // Disable WiFi and Bluetooth to reduce interruptions for smooth motor operation
+    WiFi.mode(WIFI_OFF);
+    btStop();
+    
     // Initialize the system
     if (!systemControl.begin()) {
-        Serial.println(F("FATAL ERROR: System initialization failed!"));
         // Halt execution on critical failure
         while(1) {
             delay(1000);
-            Serial.println(F("System halted due to initialization failure"));
         }
     }
-    
-    Serial.println(F("=== PET Recycler Controller Ready ==="));
-    Serial.println(F("Use rotary encoder to navigate menus"));
-    Serial.println(F("Press encoder button to change menu"));
 }
 
-// Use Eventually's event loop instead of traditional loop()
-USE_EVENTUALLY_LOOP(mgr)
+void loop() {
+    // AsyncStepper motor updates - PRIORITY #1
+    // This must be called as frequently as possible for smooth stepping
+    motor.update();
+    
+    // Low-frequency system tasks
+    static unsigned long lastSystemUpdate = 0;
+    static unsigned long lastDisplayUpdate = 0;
+    static unsigned long lastEncoderRead = 0;
+    
+    unsigned long currentMillis = millis();
+    
+    // Read encoder and button every 5ms
+    if (currentMillis - lastEncoderRead >= 5) {
+        encoder.readRotation();
+        
+        // Read button state and handle press/release
+        static bool lastButtonState = HIGH;
+        bool currentButtonState = digitalRead(encButton);
+        
+        if (currentButtonState == LOW && lastButtonState == HIGH) {
+            // Button pressed
+            encoder.handleButtonPress();
+        } else if (currentButtonState == HIGH && lastButtonState == LOW) {
+            // Button released
+            encoder.handleButtonRelease();
+        }
+        
+        lastButtonState = currentButtonState;
+        lastEncoderRead = currentMillis;
+    }
+    
+    // System updates every 50ms
+    if (currentMillis - lastSystemUpdate >= 50) {
+        // Check button press
+        if (encoder.wasButtonPressed()) {
+            menu.navigate();
+            systemControl.updateEncoderLimitsForCurrentMenu();
+        }
+        
+        // Update parameters
+        menu.updateParameters(encoder.getCurrentValue());
+        
+        // Update thermistor
+        thermistor.update();
+        
+        // Safety checks
+        systemControl.checkTemperatureSafety();
+        
+        lastSystemUpdate = currentMillis;
+    }
+    
+    // Update display every 200ms
+    if (currentMillis - lastDisplayUpdate >= 200) {
+        systemControl.updateDisplayAction();
+        lastDisplayUpdate = currentMillis;
+    }
+}
