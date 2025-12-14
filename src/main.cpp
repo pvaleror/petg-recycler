@@ -1,22 +1,17 @@
 //=============================================================================
-// PET BOTTLE RECYCLER CONTROLLER
+// PET BOTTLE RECYCLER CONTROLLER - FREERTOS EDITION
 //=============================================================================
-// Modular version - Refactored for better maintainability
-// 
-// Original project: https://www.the-diy-life.com/pet-bottle-recycler-part-1-using-an-arduino-uno-r4-to-control-a-3d-printers-hotend/
-// Hardware: ESP32-C3 DevKit M-1
-// 
-// This version separates functionality into modules:
-// - Motor: Stepper motor control
-// - Thermistor: Temperature sensing
-// - Display: OLED screen management  
-// - Menu: User interface and navigation
-// - Encoder: Rotary encoder input
-// - SystemControl: Overall system coordination
+// Professional FreeRTOS implementation with:
+// - Real multitasking with priorities
+// - Hardware interrupts for encoder
+// - Smooth motor ramping
+// - Microsecond precision timing
+// - Industrial-grade performance
 //=============================================================================
 
 #include <Arduino.h>
-#include <Eventually.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <WiFi.h>
 #include <esp_bt.h>
 
@@ -24,19 +19,107 @@
 #include <Config.h>
 #include <Pins.h>
 #include <Motor.h>
+#include <Encoder.h>
+#include <EncoderInterrupt.h>
 #include <Thermistor.h>
 #include <Display.h>
 #include <Menu.h>
-#include <Encoder.h>
 #include <SystemControl.h>
 
-// Global Eventually manager
-EvtManager mgr;
+// Task handles for FreeRTOS
+TaskHandle_t encoderTaskHandle = NULL;
+TaskHandle_t menuTaskHandle = NULL;
+TaskHandle_t sensorTaskHandle = NULL;
+TaskHandle_t displayTaskHandle = NULL;
+
+// ============================================================================
+// FREERTOS TASK FUNCTIONS
+// ============================================================================
+
+// Encoder Task - High priority for responsive input
+void encoderTask(void* pvParameters) {
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    const TickType_t taskFrequency = pdMS_TO_TICKS(ENCODER_TASK_INTERVAL);
+    
+    while (1) {
+        // Process encoder changes (captured by interrupts)
+        int delta = encoderInterrupt.getPositionDelta();
+        if (delta != 0) {
+            // Update encoder value in main encoder object
+            encoder.updateFromInterrupt(delta);
+        }
+        
+        // Process button presses (captured by interrupts)
+        if (encoderInterrupt.wasButtonPressed()) {
+            encoder.handleButtonPress();
+        }
+        
+        vTaskDelayUntil(&lastWakeTime, taskFrequency);
+    }
+}
+
+// Menu Task - Medium priority for UI updates
+void menuTask(void* pvParameters) {
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    const TickType_t taskFrequency = pdMS_TO_TICKS(MENU_TASK_INTERVAL);
+    
+    while (1) {
+        // Check for button press
+        if (encoder.wasButtonPressed()) {
+            menu.navigate();
+            systemControl.updateEncoderLimitsForCurrentMenu();
+            
+            // Small delay to prevent multiple rapid menu changes
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+        
+        // Update parameters based on encoder
+        menu.updateParameters(encoder.getCurrentValue());
+        
+        vTaskDelayUntil(&lastWakeTime, taskFrequency);
+    }
+}
+
+// Sensor Task - Low priority for temperature monitoring
+void sensorTask(void* pvParameters) {
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    const TickType_t taskFrequency = pdMS_TO_TICKS(SENSOR_TASK_INTERVAL);
+    
+    while (1) {
+        // Update thermistor
+        thermistor.update();
+        
+        // Safety checks
+        systemControl.checkTemperatureSafety();
+        
+        vTaskDelayUntil(&lastWakeTime, taskFrequency);
+    }
+}
+
+// Display Task - Lowest priority for screen updates
+void displayTask(void* pvParameters) {
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    const TickType_t taskFrequency = pdMS_TO_TICKS(DISPLAY_TASK_INTERVAL);
+    
+    while (1) {
+        // Update display
+        systemControl.updateDisplayAction();
+        
+        vTaskDelayUntil(&lastWakeTime, taskFrequency);
+    }
+}
+
+// ============================================================================
+// SETUP AND MAIN LOOP
+// ============================================================================
 
 void setup() {
-    // Disable WiFi and Bluetooth to reduce interruptions for smooth motor operation
+    // Disable WiFi and Bluetooth for maximum performance
     WiFi.mode(WIFI_OFF);
     btStop();
+    
+    // Initialize hardware interrupt encoder first
+    encoderInterrupt.begin();
     
     // Initialize the system
     if (!systemControl.begin()) {
@@ -45,63 +128,51 @@ void setup() {
             delay(1000);
         }
     }
+    
+    // Create FreeRTOS tasks with priorities
+    // Motor task is created in Motor::begin() with highest priority (5)
+    
+    xTaskCreate(
+        encoderTask,
+        "EncoderTask",
+        ENCODER_TASK_STACK,
+        NULL,
+        ENCODER_TASK_PRIORITY,  // Priority 4
+        &encoderTaskHandle
+    );
+    
+    xTaskCreate(
+        menuTask,
+        "MenuTask", 
+        MENU_TASK_STACK,
+        NULL,
+        MENU_TASK_PRIORITY,     // Priority 3
+        &menuTaskHandle
+    );
+    
+    xTaskCreate(
+        sensorTask,
+        "SensorTask",
+        SENSOR_TASK_STACK,
+        NULL,
+        SENSOR_TASK_PRIORITY,   // Priority 2
+        &sensorTaskHandle
+    );
+    
+    xTaskCreate(
+        displayTask,
+        "DisplayTask",
+        DISPLAY_TASK_STACK,
+        NULL,
+        DISPLAY_TASK_PRIORITY,  // Priority 1
+        &displayTaskHandle
+    );
 }
 
 void loop() {
-    // AsyncStepper motor updates - PRIORITY #1
-    // This must be called as frequently as possible for smooth stepping
-    motor.update();
+    // FreeRTOS handles everything - main loop can be empty or do minimal work
+    // All real work is done in tasks with proper priorities
     
-    // Low-frequency system tasks
-    static unsigned long lastSystemUpdate = 0;
-    static unsigned long lastDisplayUpdate = 0;
-    static unsigned long lastEncoderRead = 0;
-    
-    unsigned long currentMillis = millis();
-    
-    // Read encoder and button every 5ms
-    if (currentMillis - lastEncoderRead >= 5) {
-        encoder.readRotation();
-        
-        // Read button state and handle press/release
-        static bool lastButtonState = HIGH;
-        bool currentButtonState = digitalRead(encButton);
-        
-        if (currentButtonState == LOW && lastButtonState == HIGH) {
-            // Button pressed
-            encoder.handleButtonPress();
-        } else if (currentButtonState == HIGH && lastButtonState == LOW) {
-            // Button released
-            encoder.handleButtonRelease();
-        }
-        
-        lastButtonState = currentButtonState;
-        lastEncoderRead = currentMillis;
-    }
-    
-    // System updates every 50ms
-    if (currentMillis - lastSystemUpdate >= 50) {
-        // Check button press
-        if (encoder.wasButtonPressed()) {
-            menu.navigate();
-            systemControl.updateEncoderLimitsForCurrentMenu();
-        }
-        
-        // Update parameters
-        menu.updateParameters(encoder.getCurrentValue());
-        
-        // Update thermistor
-        thermistor.update();
-        
-        // Safety checks
-        systemControl.checkTemperatureSafety();
-        
-        lastSystemUpdate = currentMillis;
-    }
-    
-    // Update display every 200ms
-    if (currentMillis - lastDisplayUpdate >= 200) {
-        systemControl.updateDisplayAction();
-        lastDisplayUpdate = currentMillis;
-    }
+    // Optional: Add watchdog or system monitoring here
+    delay(1000);  // Just to prevent watchdog timeout
 }

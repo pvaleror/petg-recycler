@@ -8,8 +8,7 @@
 // Global system control instance
 SystemControl systemControl;
 
-// Global Eventually manager
-extern EvtManager mgr;
+// FreeRTOS implementation - no Eventually manager needed
 
 SystemControl::SystemControl() {
     currentTime = 0;
@@ -51,17 +50,8 @@ bool SystemControl::begin() {
 }
 
 void SystemControl::setupEventually() {
-    // Button listeners
-    mgr.addListener(new EvtPinListener(encButton, ENCODER_DEBOUNCE, HIGH, (EvtAction)buttonPressAction));
-    mgr.addListener(new EvtPinListener(encButton, 1, LOW, (EvtAction)buttonReleaseAction));
-    
-    // Encoder listener
-    mgr.addListener(new EvtTimeListener(ENCODER_READ_INTERVAL, true, (EvtAction)encoderReadAction));
-    
-    // System update listeners
-    mgr.addListener(new EvtTimeListener(EventLoopTime, true, (EvtAction)updateDisplayCallback));
-    mgr.addListener(new EvtTimeListener(SensorLoopTime, true, (EvtAction)checkInputsCallback));
-    mgr.addListener(new EvtTimeListener(MenuLoopTime, true, (EvtAction)handleMenuCallback));
+    // FreeRTOS implementation - tasks are created in main.cpp
+    // This method is kept for compatibility but does nothing
 }
 
 void SystemControl::update() {
@@ -101,22 +91,23 @@ bool SystemControl::checkTemperatureSafety() {
 void SystemControl::updateEncoderLimitsForCurrentMenu() {
     switch (menu.getCurrentMenu()) {
         case MENU_TEMPERATURE:
-            encoder.setCurrentValue(menu.getSetpoint());
             encoder.setLimits(minTemp, maxTemp);
+            encoder.setCurrentValue(menu.getSetpoint());
             break;
             
         case MENU_SPEED:
-            encoder.setCurrentValue(motor.getSpeed());
             encoder.setLimits(minSpeed, maxSpeed);
+            encoder.setCurrentValue(motor.getSpeed());
             break;
             
         case MENU_EXTRUDE:
-            encoder.setCurrentValue(motor.getDirection());
             encoder.setLimits(0, 2);
+            encoder.setCurrentValue(motor.getDirection());
             break;
             
         case MENU_STATUS:
             encoder.setLimits(0, 0);
+            encoder.setCurrentValue(0);
             break;
     }
 }
@@ -162,16 +153,6 @@ bool SystemControl::handleMenuAction() {
 
 
 
-// Eventually callback functions
-bool updateDisplayCallback(EvtListener *lstn) {
-    return systemControl.updateDisplayAction();
-}
-
-bool checkInputsCallback(EvtListener *lstn) {
-    return systemControl.checkInputsAction();
-}
-
-bool handleMenuCallback(EvtListener *lstn) {
-    return systemControl.handleMenuAction();
-}
+// FreeRTOS implementation - callback functions not needed
+// Tasks call methods directly
 

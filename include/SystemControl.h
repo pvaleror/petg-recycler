@@ -2,7 +2,7 @@
 #define SYSTEM_CONTROL_H
 
 #include <Arduino.h>
-#include <Eventually.h>
+// FreeRTOS implementation - no Eventually needed
 #include <Config.h>
 
 class SystemControl {
@@ -39,10 +39,7 @@ private:
 // Global system control instance
 extern SystemControl systemControl;
 
-// Eventually callback functions
-bool updateDisplayCallback(EvtListener *lstn);
-bool checkInputsCallback(EvtListener *lstn);
-bool handleMenuCallback(EvtListener *lstn);
+// FreeRTOS implementation - no callback functions needed
 
 
 #endif // SYSTEM_CONTROL_H

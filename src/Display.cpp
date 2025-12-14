@@ -64,17 +64,17 @@ void Display::showLabels(MenuState currentMenu) {
     
     // Header
     setCursorAtLine(1);
-    oled.print(F(" Current Temp:"));
+    oled.print(F("  Current Temp:"));
     
     // Menu items with selection indicator
     setCursorAtLine(2);
-    oled.print(currentMenu == MENU_TEMPERATURE ? ">Set Temp:" : " Set Temp:");
+    oled.print(currentMenu == MENU_TEMPERATURE ? "> Target Temp:" : "  Target Temp:");
     
     setCursorAtLine(3);
-    oled.print(currentMenu == MENU_SPEED ? ">Extrude Speed:" : " Extrude Speed:");
+    oled.print(currentMenu == MENU_SPEED ? "> Speed:" : "  Speed:");
     
     setCursorAtLine(4);
-    oled.print(currentMenu == MENU_EXTRUDE ? ">Extrude:" : " Extrude:");
+    oled.print(currentMenu == MENU_EXTRUDE ? "> Extrude:" : "  Extrude:");
 }
 
 void Display::showValues(double currentTemp, double setpoint, int speed, const char* motorDir) {

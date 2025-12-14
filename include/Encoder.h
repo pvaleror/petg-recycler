@@ -39,6 +39,9 @@ public:
     
     // Button state
     bool wasButtonPressed() { bool pressed = buttonPressed; buttonPressed = false; return pressed; }
+    
+    // Interrupt support functions
+    void updateFromInterrupt(int delta);  // Called from interrupt task
 
 private:
     void updateParameters();

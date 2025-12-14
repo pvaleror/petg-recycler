@@ -55,10 +55,8 @@ bool Encoder::readRotation() {
 }
 
 bool Encoder::handleButtonPress() {
-    if (!lastPressState) {
-        // Set a flag that SystemControl can check
-        buttonPressed = true;
-    }
+    // Always set the flag when called from interrupt
+    buttonPressed = true;
     lastPressState = true;
     return false;
 }
@@ -81,6 +79,20 @@ void Encoder::updateLimitsForMenu() {
 
 void Encoder::updateParameters() {
     // This will be handled by SystemControl to avoid circular dependencies
+}
+
+void Encoder::updateFromInterrupt(int delta) {
+    // Update encoder value based on interrupt delta
+    int newValue = encCurrent + (delta * encIncrement);
+    
+    // Apply limits
+    newValue = constrain(newValue, encLowLim, encHighLim);
+    
+    // Only update if value actually changed
+    if (newValue != encCurrent) {
+        encCurrent = newValue;
+        updateParameters();
+    }
 }
 
 // Eventually callback functions

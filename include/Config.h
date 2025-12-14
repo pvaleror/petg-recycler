@@ -28,15 +28,15 @@
 // CONFIGURACIÓN DE TEMPERATURA
 // =============================================================================
 #define initialTemp   220                   // Temperatura inicial por defecto (°C)
-#define minTemp       180                   // Temperatura mínima permitida (°C)
-#define maxTemp       245                   // Temperatura máxima permitida (°C)
+#define minTemp       200                   // Temperatura mínima permitida (°C)
+#define maxTemp       260                   // Temperatura máxima permitida (°C)
 #define tempTolerance 10                    // Tolerancia de temperatura (°C)
 
 // =============================================================================
 // CONFIGURACIÓN DE MOTOR
 // =============================================================================
 #define minSpeed      1                     // Velocidad mínima del motor
-#define maxSpeed      25                    // Velocidad máxima del motor (limitada para evitar trabas)
+#define maxSpeed      15                    // Velocidad máxima del motor (limitada para evitar trabas)
 #define stepsPerRevolution 200              // Pasos por revolución del motor
 
 // Configuración comentada (no utilizada actualmente)
@@ -74,15 +74,52 @@
 // =============================================================================
 #define ENC_INCREMENT        1              // Incremento del encoder por paso
 #define ENCODER_DEBOUNCE     50             // Debounce del botón (ms)
-#define ENCODER_READ_INTERVAL 5             // Intervalo de lectura encoder (ms)
+#define ENCODER_READ_INTERVAL 100             // Intervalo de lectura encoder (ms)
 
 // =============================================================================
-// CONFIGURACIÓN DE MOTOR PASO A PASO (AsyncStepperLib)
+// CONFIGURACIÓN DE FREERTOS (TAREAS Y PRIORIDADES)
+// =============================================================================
+#define MOTOR_TASK_INTERVAL     1           // Motor task interval (ms) - Ultra high frequency
+#define ENCODER_TASK_INTERVAL   10          // Encoder task interval (ms) - Fast response
+#define MENU_TASK_INTERVAL      50          // Menu task interval (ms) - UI updates
+#define SENSOR_TASK_INTERVAL    100         // Sensor task interval (ms) - Temperature monitoring
+#define DISPLAY_TASK_INTERVAL   200         // Display task interval (ms) - Screen updates
+
+// Prioridades FreeRTOS (mayor número = mayor prioridad)
+#define MOTOR_TASK_PRIORITY     5           // CRÍTICO - Motor fluido
+#define ENCODER_TASK_PRIORITY   4           // IMPORTANTE - Input capture
+#define MENU_TASK_PRIORITY      3           // MEDIO - UI responsiva
+#define SENSOR_TASK_PRIORITY    2           // BAJO - Monitoreo
+#define DISPLAY_TASK_PRIORITY   1           // MUY BAJO - Actualización visual
+
+// Stack sizes para cada task
+#define MOTOR_TASK_STACK        2048        // Stack para motor task
+#define ENCODER_TASK_STACK      2048        // Stack para encoder task
+#define MENU_TASK_STACK         2048        // Stack para menu task
+#define SENSOR_TASK_STACK       2048        // Stack para sensor task
+#define DISPLAY_TASK_STACK      3072        // Stack para display task (más memoria)
+
+// =============================================================================
+// CONFIGURACIÓN DE MOTOR PASO A PASO (FreeRTOS + Ramping Optimized)
 // =============================================================================
 #define MOTOR_DEFAULT_SPEED  5              // Velocidad inicial del motor
-#define MOTOR_MAX_SPEED      2000           // Máxima velocidad en pasos/segundo
-#define MOTOR_MIN_SPEED      50             // Mínima velocidad en pasos/segundo
-#define MOTOR_ACCELERATION   1000           // Aceleración en pasos/segundo²
 #define MOTOR_DIRECTION_SETTLE_TIME 100     // Tiempo de estabilización dirección (μs)
+
+// Velocidades en steps/segundo (más intuitivo que microsegundos)
+#define MOTOR_MAX_SPEED_STEPS_SEC   800    // Velocidad máxima (steps/s)
+#define MOTOR_MIN_SPEED_STEPS_SEC   20      // Velocidad mínima (steps/s)
+#define MOTOR_DEFAULT_SPEED_STEPS   200     // Velocidad inicial (steps/s)
+
+// Ramping y aceleración (para movimiento suave)
+#define MOTOR_ACCELERATION_STEPS_S2 1000    // Aceleración (steps/s²)
+#define MOTOR_DECELERATION_STEPS_S2 1000    // Desaceleración (steps/s²)
+#define MOTOR_RAMP_UPDATE_INTERVAL  1       // Actualizar ramping cada 1ms
+
+// Timing de mensajes de estado
+#define MOTOR_STATUS_UPDATE_INTERVAL 500    // Intervalo de actualización de mensajes (ms)
+
+// Encoder debounce (para interrupciones)
+#define ENCODER_DEBOUNCE_MICROS     2000    // Debounce encoder (μs)
+#define BUTTON_DEBOUNCE_MILLIS      50      // Debounce botón (ms)
 
 #endif // CONFIG_H
