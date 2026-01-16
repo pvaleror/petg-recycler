@@ -11,6 +11,10 @@ if %ERRORLEVEL% EQU 0 (
     echo.
     echo Ejecutando upload automaticamente...
     call upload.bat
+    echo Versionado cambios en git...
+    git add .
+    git commit -m "$1"
+    git push
 ) else (
     echo ❌ Error en la compilacion
 )
