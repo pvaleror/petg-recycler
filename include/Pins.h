@@ -16,8 +16,8 @@ static int pinB = 3;                        // Encoder B   (GPIO3)
 
 
 // Analog inputs (ADC1)
-#define THERM_PIN     0                     // Thermistor analog input (GPIO0)
-#define SPARE_ADC1    1                     // Spare analog input (GPIO1)
+#define THERM_PIN     1                     // Thermistor analog input (GPIO0)
+//#define SPARE_ADC1    1                     // Spare analog input (GPIO1)
 #define SPARE_ADC2    5                     // Spare analog input (GPIO5, other side)
 
 // Motor control pins (adjust these to your actual pin numbers)

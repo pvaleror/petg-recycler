@@ -259,7 +259,7 @@ double readThermistorC(){
     delay(2);
   }
   double reading = (double)sum / (double)NUM_SAMPLES;
-  if (reading <= 0.5) return -273.15; // avoid div by zero, return min
+  //if (reading <= 0.5) return -273.15; // avoid div by zero, return min
 
   double ratio = reading / ADC_MAX;                 // V/VDDA
   if (ratio >= 0.9995) ratio = 0.9995;              // clamp

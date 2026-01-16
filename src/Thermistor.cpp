@@ -1,4 +1,9 @@
 #include "Thermistor.h"
+#include <math.h>
+
+#ifndef PI
+#define PI 3.14159265359
+#endif
 
 // Global thermistor instance
 Thermistor thermistor;
@@ -6,38 +11,40 @@ Thermistor thermistor;
 Thermistor::Thermistor() {
     currentTemperature = 25.0;
     lastReadTime = 0;
-    simulationMode = true; // Start in simulation mode
 }
 
 void Thermistor::begin() {
     pinMode(THERM_PIN, INPUT);
+    //analogSetAttenuation(ADC_11db);  // Rango 0-3.3V completo
+    analogSetPinAttenuation(THERM_PIN, ADC_11db);  // Específico para GPIO0
     analogReadResolution(12);
     currentTemperature = readTemperatureC();
 }
 
 double Thermistor::readTemperatureC() {
-    if (simulationMode) {
-        currentTemperature = readSimulatedTemperature();
-    } else {
-        currentTemperature = readRealTemperature();
-    }
-    return currentTemperature;
-}
-
-double Thermistor::readRealTemperature() {
     long sum = 0;
     for (int i = 0; i < NUM_SAMPLES; i++) {
         sum += analogRead(THERM_PIN);
         delay(2);
     }
+
+    
     double reading = (double)sum / (double)NUM_SAMPLES;
-    if (reading <= 0.5) return -273.15; // avoid div by zero, return min
+    
+    // Ratio ADC (0.0 a 1.0)
+    double ratio = reading / ADC_MAX;
+    
+    // Clamp para evitar divisiones por cero
+    if (ratio >= 0.99) ratio = 0.99;
+    if (ratio <= 0.01) ratio = 0.01;
 
-    double ratio = reading / ADC_MAX;                 // V/VDDA
-    if (ratio >= 0.9995) ratio = 0.9995;              // clamp
-    if (ratio <= 0.0005) ratio = 0.0005;
-
-    double resistance = SERIES_RESISTOR * (ratio / (1.0 - ratio));
+    // Cálculo correcto para el circuito actual:
+    // GND ──[Termistor]──┬──[51kΩ]── 3.3V
+    //                   │
+    //                GPIO0
+    // Cuando ratio es bajo (voltaje bajo), termistor tiene baja resistencia (alta temperatura)
+    // Cuando ratio es alto (voltaje alto), termistor tiene alta resistencia (baja temperatura)
+    double resistance = SERIES_RESISTOR * ((1.0 - ratio) / ratio);
 
     double steinhart;
     steinhart = resistance / THERMISTOR_NOMINAL;      // (R/R0)
@@ -46,12 +53,57 @@ double Thermistor::readRealTemperature() {
     steinhart += 1.0 / (TEMPERATURE_NOMINAL + 273.15);// + 1/T0
     steinhart = 1.0 / steinhart;                      // Invert
     steinhart -= 273.15;                              // K -> C
-    return steinhart;
+    
+    // Calibración basada en mediciones reales:
+    // 40°C real → 36°C medido
+    // 94°C real → 90°C medido
+    // 100°C real → 107°C medido  
+    // 118°C real → 107°C medido
+    // 175°C real → 107°C medido (saturación)
+    // 190°C real → 107°C medido (saturación)
+    
+    double calibratedTemp = steinhart;
+    
+    if (steinhart <= 50) {
+        // Rango bajo: 36°C medido → 40°C real
+        calibratedTemp = steinhart * 1.111; // Factor de corrección 40/36
+    } else if (steinhart <= 90) {
+        // Rango medio: interpolación lineal entre 36→40 y 90→94
+        calibratedTemp = 40 + (steinhart - 36) * (94 - 40) / (90 - 36);
+    } else if (steinhart <= 107) {
+        // Rango de saturación: el termistor se satura en 107°C
+        // Necesitamos extrapolar basándose en el punto donde empieza la saturación
+        // 100°C real → 107°C medido, entonces extrapolamos linealmente
+        double saturationPoint = 107.0;
+        double realTempAtSaturation = 100.0;
+        
+        // Extrapolación agresiva para temperaturas altas
+        calibratedTemp = realTempAtSaturation + (steinhart - saturationPoint) * 10.0;
+        
+        // Si está exactamente en 107°C, asumimos que puede ser cualquier temperatura alta
+        if (abs(steinhart - 107.0) < 0.5) {
+            // Temperatura indeterminada en rango alto, usar valor conservador
+            calibratedTemp = 120.0; // Valor por defecto para saturación
+        }
+    } else {
+        // Por encima de la saturación (no debería ocurrir, pero por seguridad)
+        calibratedTemp = 200.0; // Valor alto por defecto
+    }
+    
+    // Validación de rango razonable
+    if (calibratedTemp < -50.0 || calibratedTemp > 500.0) {
+        return -273.15; // Error: temperatura fuera de rango
+    }
+    
+    return calibratedTemp;
 }
 
 double Thermistor::readSimulatedTemperature() {
-    // Simple demo value that changes over time
-    return 25.0 + (millis() % 1000) / 100.0;
+    // Simulación más realista para pruebas
+    // Temperatura que oscila lentamente entre 220-240°C
+    double baseTemp = 230.0;
+    double variation = 10.0 * sin((millis() / 5000.0) * 2.0 * PI);
+    return baseTemp + variation;
 }
 
 bool Thermistor::checkTemperature(double setpoint, double tolerance) {
@@ -67,7 +119,7 @@ void Thermistor::update() {
     unsigned long currentTime = millis();
     // Update temperature reading every 100ms
     if (currentTime - lastReadTime >= 100) {
-        readTemperatureC();
+        currentTemperature = readTemperatureC();
         lastReadTime = currentTime;
     }
 }

@@ -53,10 +53,15 @@
 // =============================================================================
 // CONFIGURACIÓN DE TERMISTOR
 // =============================================================================
+// Circuito real (configuración optimizada):
+// GND ──[Termistor NTC 100kΩ]──┬──[51kΩ]── 3.3V
+//                              │
+//                           GPIO0 (ADC - referencia 3.3V)
+//
 #define THERMISTOR_NOMINAL    100000.0      // Resistencia a 25°C (Ohms)
 #define TEMPERATURE_NOMINAL   25.0          // Temperatura nominal (°C)
-#define B_COEFFICIENT         3950.0        // Coeficiente Beta del termistor
-#define SERIES_RESISTOR       100000.0      // Resistor pull-up (Ohms)
+#define B_COEFFICIENT         3950.0        // Coeficiente Beta del termistor (especificación real)
+#define SERIES_RESISTOR       51000.0       // Resistor pull-up (Ohms) - Valor real del circuito
 #define NUM_SAMPLES           10            // Muestras para promedio
 #define ADC_MAX               4095.0        // ADC de 12 bits (ESP32)
 

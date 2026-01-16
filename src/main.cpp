@@ -117,7 +117,10 @@ void setup() {
     // Disable WiFi and Bluetooth for maximum performance
     WiFi.mode(WIFI_OFF);
     btStop();
-    
+    Serial.begin(115200);
+    delay(1000);              // dar tiempo al PC a enganchar el puerto
+    Serial.println("Arrancando...");
+
     // Initialize hardware interrupt encoder first
     encoderInterrupt.begin();
     
@@ -172,7 +175,6 @@ void setup() {
 void loop() {
     // FreeRTOS handles everything - main loop can be empty or do minimal work
     // All real work is done in tasks with proper priorities
-    
     // Optional: Add watchdog or system monitoring here
     delay(1000);  // Just to prevent watchdog timeout
 }
