@@ -11,6 +11,7 @@ git diff --staged --quiet
 if errorlevel 1 (
     echo Haciendo commit: %COMMIT_MSG%
     git commit -m "%COMMIT_MSG%"
+    git show --name-only
     git push
     echo Commit y push exitosos.
 ) else (
